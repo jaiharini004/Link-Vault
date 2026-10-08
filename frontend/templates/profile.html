@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkVault — Smart Bookmark Manager</title>
+  <meta name="description" content="LinkVault — Organise, search, and manage all your important links in one beautiful dashboard.">
+  <link rel="stylesheet" href="/app/static/css/style.css?v=3">
+  <link rel="stylesheet" href="../static/css/style.css?v=3">
+  <style>
+    /* Filter chip pills for active-filters-bar */
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      background: var(--color-bg-accent, #F0F4FF);
+      border: 1px solid var(--color-border, #CBD5E1);
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--color-text-body, #334155);
+      margin-right: 6px;
+      margin-bottom: 4px;
+    }
+    .filter-chip-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      color: var(--color-text-muted, #64748B);
+      padding: 0 2px;
+    }
+    .filter-chip-close:hover { color: #dc2626; }
+    /* Favorite active state */
+    .btn-favorite.is-favorite svg polygon { fill: #f59e0b; stroke: #f59e0b; }
+    #active-filters-bar { display: flex; flex-wrap: wrap; padding: 4px 0; min-height: 0; }
+  </style>
+</head>
+<body class="dashboard-body">
+
+  <!-- =========================================================================
+       1. HEADER
+       ========================================================================= -->
+  <header class="app-header" id="app-header">
+    <div class="header-brand">
+      <div class="brand-logo" id="brand-logo" aria-hidden="true">
+        <!-- Clean SVG Link Icon -->
+        <span class="brand-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+        </span>
+      </div>
+      <h1 class="brand-title" id="brand-title">LinkVault</h1>
+    </div>
+
+    <div class="header-actions" id="header-actions">
+      <button type="button" class="btn btn-secondary" id="btn-export-whatsapp" title="Export current links to WhatsApp">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom; margin-right: 4px;">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        WhatsApp Export
+      </button>
+      <button type="button" class="btn btn-secondary" id="btn-import-whatsapp" aria-haspopup="dialog" style="border: 1px solid #1E3A8A; color: #1E3A8A; background: #F0F4FF;" onclick="openModal('whatsapp-staging-modal')">
+        Import WhatsApp Chat
+      </button>
+      <button type="button" class="btn btn-secondary" id="btn-open-category-manager" aria-haspopup="dialog">
+        Manage Categories
+      </button>
+      <button type="button" class="btn btn-primary" id="btn-open-add-link" aria-haspopup="dialog">
+        + Add Link
+      </button>
+      <div id="auth-buttons" style="display:inline-flex; gap:8px; margin-left:16px; border-left:1px solid #CBD5E1; padding-left:16px; align-items:center;">
+        <!-- Logged out state buttons -->
+        <div id="unauth-actions" style="display:inline-flex; gap:8px;">
+          <button type="button" class="btn btn-outline" id="btn-signin" onclick="openModal('modal-signin')">Sign In</button>
+          <button type="button" class="btn btn-outline" id="btn-signup" onclick="openModal('modal-signup')">Create Account</button>
+        </div>
+        
+        <!-- Logged in state: Avatar & Dropdown -->
+        <div id="auth-user-widget" style="display:none; position:relative;">
+          <div class="avatar-circle" id="user-avatar" onclick="toggleProfileDropdown()"></div>
+          
+          <div class="profile-dropdown" id="profile-dropdown">
+            <div class="profile-header">
+              <div class="profile-header-name" id="profile-name"></div>
+              <div class="profile-header-email" id="profile-email"></div>
+            </div>
+            
+            <ul class="profile-menu">
+              <li>
+                <a href="/profile">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  Profile
+                </a>
+              </li>
+              <li class="profile-menu-divider"></li>
+              <li>
+                <div class="appearance-selector-wrapper">
+                  <label class="appearance-label" for="theme-select">Appearance</label>
+                  <select class="appearance-select" id="theme-select" onchange="handleThemeChange(this.value)">
+                    <option value="system">System Default</option>
+                    <option value="dark">Dark Mode</option>
+                  </select>
+                </div>
+              </li>
+              <li class="profile-menu-divider"></li>
+              <li>
+                <button type="button" id="btn-signout" onclick="handleSignOut()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                  Sign Out
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       MAIN DASHBOARD LAYOUT (Sidebar + Main Content Area)
+       ========================================================================= -->
+  <div class="dashboard-layout" id="dashboard-layout">
+
+    <!-- =======================================================================
+         2. SIDEBAR NAVIGATION
+         ======================================================================= -->
+    <aside class="app-sidebar" id="app-sidebar" aria-label="Sidebar Navigation">
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <!-- Primary Views / Filters -->
+        <div class="nav-section">
+          <h2 class="nav-section-title">Navigation</h2>
+          <ul class="nav-list" id="nav-views-list">
+            <li class="nav-item">
+              <a href="/" class="nav-link nav-link-active" id="nav-filter-all" data-filter="all">
+                <span class="nav-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                </span>
+                <span class="nav-label">All Links</span>
+                <span class="nav-badge" id="badge-count-all">0</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="/favorites" class="nav-link" id="nav-filter-favorites" data-filter="favorites">
+                <span class="nav-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                  </svg>
+                </span>
+                <span class="nav-label">Favorites</span>
+                <span class="nav-badge" id="badge-count-favorites">0</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="/recent" class="nav-link" id="nav-filter-recents" data-filter="recents">
+                <span class="nav-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                </span>
+                <span class="nav-label">Recent Links</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 5. CATEGORY NAVIGATION AREA -->
+        <div class="nav-section">
+          <div class="nav-section-header">
+            <h2 class="nav-section-title">Categories</h2>
+            <button type="button" class="btn-icon-subtle" id="btn-sidebar-add-category" title="New Category" aria-label="Add New Category" onclick="openModal('modal-category-manager')">
+              +
+            </button>
+          </div>
+          <!-- Dynamic category list container for JavaScript rendering -->
+          <ul class="nav-list category-nav-list" id="category-nav-list">
+            <li class="nav-item" data-category="github">
+              <a href="/github" class="nav-link" id="nav-cat-github" data-category-id="github">
+                <span class="category-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                  </svg>
+                </span>
+                <span class="nav-label">GitHub</span>
+                <span class="nav-badge" id="badge-cat-github">0</span>
+              </a>
+            </li>
+            <li class="nav-item" data-category="google-drive">
+              <a href="/google-drive" class="nav-link" id="nav-cat-drive" data-category-id="google-drive">
+                <span class="category-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                </span>
+                <span class="nav-label">Google Drive</span>
+                <span class="nav-badge" id="badge-cat-drive">0</span>
+              </a>
+            </li>
+            <li class="nav-item" data-category="google-meet">
+              <a href="/google-meet" class="nav-link" id="nav-cat-meet" data-category-id="google-meet">
+                <span class="category-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                  </svg>
+                </span>
+                <span class="nav-label">Google Meet</span>
+                <span class="nav-badge" id="badge-cat-meet">0</span>
+              </a>
+            </li>
+            <li class="nav-item" data-category="youtube">
+              <a href="/youtube" class="nav-link" id="nav-cat-youtube" data-category-id="youtube">
+                <span class="category-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                </span>
+                <span class="nav-label">YouTube</span>
+                <span class="nav-badge" id="badge-cat-youtube">0</span>
+              </a>
+            </li>
+            <li class="nav-item" data-category="linkedin">
+              <a href="/linkedin" class="nav-link" id="nav-cat-linkedin" data-category-id="linkedin">
+                <span class="category-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+                    <rect x="2" y="9" width="4" height="12"></rect>
+                    <circle cx="4" cy="4" r="2"></circle>
+                  </svg>
+                </span>
+                <span class="nav-label">LinkedIn</span>
+                <span class="nav-badge" id="badge-cat-linkedin">0</span>
+              </a>
+            </li>
+            <li class="nav-item" data-category="others">
+              <a href="/others" class="nav-link" id="nav-cat-others" data-category-id="others">
+                <span class="category-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                  </svg>
+                </span>
+                <span class="nav-label">Others</span>
+                <span class="nav-badge" id="badge-cat-others">0</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- =======================================================================
+         MAIN WORKSPACE CONTENT AREA
+         ======================================================================= -->
+        <main class="app-main" id="app-main" style="overflow-y: auto;">
+      <div style="max-width: 800px; margin: 0 auto; width: 100%;">
+        <section class="hero-section" style="padding: 32px 16px 16px;">
+          <h2 style="font-size: 28px; font-weight: 700; color: var(--color-text-dark); margin-bottom: 8px; letter-spacing: -0.5px;">Profile Settings</h2>
+          <p style="font-size: 15px; color: var(--color-text-muted);">Manage your account details and preferences.</p>
+        </section>
+        
+        <div style="display: flex; flex-direction: column; gap: 24px; padding: 16px;">
+        <!-- User Overview -->
+        <div class="stat-card" style="display: flex; align-items: center; gap: 16px; padding: 24px;">
+          <div class="avatar-circle" style="width: 64px; height: 64px; font-size: 28px;" id="profile-page-avatar">H</div>
+          <div>
+            <h3 style="font-size: 20px; color: var(--color-text-dark);" id="profile-page-name">Harini</h3>
+            <p style="color: var(--color-text-muted);" id="profile-page-email">harini@example.com</p>
+            <span class="badge" style="background: var(--color-bg-accent); color: var(--color-primary); padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 8px;">Pro User</span>
+          </div>
+        </div>
+        
+        <!-- Account Metrics -->
+        <div class="stat-card" style="padding: 24px; flex-direction: column; align-items: stretch; gap: 0;">
+          <h3 style="font-size: 16px; color: var(--color-text-dark); margin-bottom: 16px;">Account Metrics</h3>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--color-text-body);">Total Saved Links</span>
+            <span style="font-weight: 600; color: var(--color-text-dark);">124</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--color-text-body);">Favorites</span>
+            <span style="font-weight: 600; color: var(--color-text-dark);">12</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--color-text-body);">Top Category</span>
+            <span style="font-weight: 600; color: var(--color-text-dark);">GitHub (45%)</span>
+          </div>
+        </div>
+
+        <!-- Account Details Form -->
+        <div class="stat-card" style="padding: 24px; flex-direction: column; align-items: stretch; gap: 0;">
+          <h3 style="font-size: 16px; color: var(--color-text-dark); margin-bottom: 16px;">Account Details</h3>
+          <form onsubmit="event.preventDefault(); alert('Profile updated');">
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label class="form-label" style="color: var(--color-text-body);">Username</label>
+              <input type="text" class="form-control" value="Harini">
+            </div>
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label class="form-label" style="color: var(--color-text-body);">Email</label>
+              <input type="email" class="form-control" value="harini@example.com">
+            </div>
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label class="form-label" style="color: var(--color-text-body);">Bio</label>
+              <textarea class="form-control" rows="3">Full-Stack Developer</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </form>
+        </div>
+
+        <!-- Security & Preferences -->
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <div class="stat-card" style="padding: 24px; flex-direction: column; align-items: stretch; gap: 0;">
+            <h3 style="font-size: 16px; color: var(--color-text-dark); margin-bottom: 16px;">Security Settings</h3>
+            <form onsubmit="event.preventDefault(); alert('Password updated');">
+              <div class="form-group" style="margin-bottom: 16px;">
+                <input type="password" class="form-control" placeholder="Current Password">
+              </div>
+              <div class="form-group" style="margin-bottom: 16px;">
+                <input type="password" class="form-control" placeholder="New Password">
+              </div>
+              <div class="form-group" style="margin-bottom: 16px;">
+                <input type="password" class="form-control" placeholder="Confirm Password">
+              </div>
+              <button type="submit" class="btn btn-outline">Update Password</button>
+            </form>
+          </div>
+
+          <div class="stat-card" style="padding: 24px; flex-direction: column; align-items: stretch; gap: 0;">
+            <h3 style="font-size: 16px; color: var(--color-text-dark); margin-bottom: 16px;">Preferences</h3>
+            <div class="form-group">
+              <label class="form-label" style="color: var(--color-text-body);">Appearance Theme</label>
+              <select class="form-control" onchange="handleThemeChange(this.value)" id="profile-theme-select">
+                <option value="system">System Default</option>
+                <option value="dark">Dark Mode</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        </div>
+
+      </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- =========================================================================
+       8. MODAL MARKUP STRUCTURES
+       ========================================================================= -->
+
+  <!-- MODAL 1: ADD LINK -->
+  <div class="modal-backdrop" id="modal-add-link" role="dialog" aria-modal="true" aria-labelledby="modal-add-link-title" hidden>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-add-link-title">Add New Link</h2>
+        <button type="button" class="modal-btn-close" id="btn-close-modal-add" aria-label="Close Add Link dialog">&times;</button>
+      </div>
+
+      <form class="modal-form" id="form-add-link" novalidate>
+        <div class="modal-body">
+          <!-- URL Input -->
+          <div class="form-group">
+            <label for="add-link-url" class="form-label">Destination URL *</label>
+            <input 
+              type="url" 
+              class="form-control" 
+              id="add-link-url" 
+              name="original_url" 
+              placeholder="https://example.com/resource" 
+              required
+              autocomplete="off"
+            >
+            <span class="form-hint" id="add-link-url-hint">Auto-detection will inspect domain (GitHub, Meet, Drive, etc.)</span>
+          </div>
+
+          <!-- Title Input -->
+          <div class="form-group">
+            <label for="add-link-title" class="form-label">Link Title *</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="add-link-title" 
+              name="title" 
+              placeholder="e.g., Project Roadmap Documentation" 
+              required
+            >
+          </div>
+
+          <!-- Category Selection -->
+          <div class="form-group">
+            <label for="add-link-category" class="form-label">Category</label>
+            <select class="form-control form-select" id="add-link-category" name="category_id">
+              <option value="">Select or Auto-Detect Category</option>
+              <option value="github">GitHub</option>
+              <option value="google-drive">Google Drive</option>
+              <option value="google-meet">Google Meet</option>
+              <option value="youtube">YouTube</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="others">Others</option>
+            </select>
+          </div>
+
+          <!-- Description Input -->
+          <div class="form-group">
+            <label for="add-link-description" class="form-label">Description / Notes</label>
+            <textarea 
+              class="form-control" 
+              id="add-link-description" 
+              name="description" 
+              rows="3" 
+              placeholder="Brief context or notes about this link..."
+            ></textarea>
+          </div>
+
+          <!-- Tags Input -->
+          <div class="form-group">
+            <label for="add-link-tags" class="form-label">Tags (comma-separated)</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="add-link-tags" 
+              name="tags" 
+              placeholder="e.g., work, sprint-4, documentation"
+            >
+          </div>
+
+          <!-- Favorite Toggle Option -->
+          <div class="form-group form-checkbox-group">
+            <label class="form-checkbox-label">
+              <input type="checkbox" id="add-link-is-favorite" name="is_favorite" value="true">
+              Mark as Favorite
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-modal-add">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-add-link">Save Link</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: EDIT LINK -->
+  <div class="modal-backdrop" id="modal-edit-link" role="dialog" aria-modal="true" aria-labelledby="modal-edit-link-title" hidden>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-edit-link-title">Edit Link</h2>
+        <button type="button" class="modal-btn-close" id="btn-close-modal-edit" aria-label="Close Edit Link dialog">&times;</button>
+      </div>
+
+      <form class="modal-form" id="form-edit-link" novalidate>
+        <!-- Hidden ID Field for JavaScript referencing -->
+        <input type="hidden" id="edit-link-id" name="id" value="">
+
+        <div class="modal-body">
+          <!-- URL Input -->
+          <div class="form-group">
+            <label for="edit-link-url" class="form-label">Destination URL *</label>
+            <input 
+              type="url" 
+              class="form-control" 
+              id="edit-link-url" 
+              name="original_url" 
+              required
+            >
+          </div>
+
+          <!-- Title Input -->
+          <div class="form-group">
+            <label for="edit-link-title" class="form-label">Link Title *</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="edit-link-title" 
+              name="title" 
+              required
+            >
+          </div>
+
+          <!-- Category Selection -->
+          <div class="form-group">
+            <label for="edit-link-category" class="form-label">Category</label>
+            <select class="form-control form-select" id="edit-link-category" name="category_id">
+              <option value="">Select Category</option>
+              <option value="github">GitHub</option>
+              <option value="google-drive">Google Drive</option>
+              <option value="google-meet">Google Meet</option>
+              <option value="youtube">YouTube</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="others">Others</option>
+            </select>
+          </div>
+
+          <!-- Description Input -->
+          <div class="form-group">
+            <label for="edit-link-description" class="form-label">Description / Notes</label>
+            <textarea 
+              class="form-control" 
+              id="edit-link-description" 
+              name="description" 
+              rows="3" 
+            ></textarea>
+          </div>
+
+          <!-- Tags Input -->
+          <div class="form-group">
+            <label for="edit-link-tags" class="form-label">Tags (comma-separated)</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="edit-link-tags" 
+              name="tags" 
+            >
+          </div>
+
+          <!-- Favorite Toggle Option -->
+          <div class="form-group form-checkbox-group">
+            <label class="form-checkbox-label">
+              <input type="checkbox" id="edit-link-is-favorite" name="is_favorite" value="true">
+              Mark as Favorite
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-modal-edit">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-edit-link">Update Link</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 3: CATEGORY MANAGER -->
+  <div class="modal-backdrop" id="modal-category-manager" role="dialog" aria-modal="true" aria-labelledby="modal-category-manager-title" hidden>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-category-manager-title">Category Manager</h2>
+        <button type="button" class="modal-btn-close" id="btn-close-modal-category" aria-label="Close Category Manager dialog">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- New Category Creation Form Area -->
+        <form class="category-create-form" id="form-create-category" novalidate>
+          <h3 class="subsection-title">Create New Category</h3>
+          
+          <div class="form-group">
+            <label for="category-name-input" class="form-label">Category Name *</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="category-name-input" 
+              name="name" 
+              placeholder="e.g., Work, Research, Articles" 
+              required
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="category-description-input" class="form-label">Category Description</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="category-description-input" 
+              name="description" 
+              placeholder="Optional notes regarding this category" 
+            >
+          </div>
+
+          <div class="form-action-row">
+            <button type="submit" class="btn btn-primary btn-sm" id="btn-save-category">
+              Save Category
+            </button>
+          </div>
+        </form>
+
+        <hr class="modal-divider" aria-hidden="true">
+
+        <!-- Existing Categories List / Edit Section -->
+        <div class="existing-categories-container" id="existing-categories-container">
+          <h3 class="subsection-title">Existing Categories</h3>
+          <ul class="categories-management-list" id="categories-management-list">
+            <!-- Sample list items ready for JS replacement/hydration -->
+            <li class="category-item" data-category-id="github">
+              <div class="category-info">
+                <strong class="category-item-name">GitHub</strong>
+                <span class="category-item-desc">Code repositories and pull requests</span>
+              </div>
+              <div class="category-item-actions">
+                <button type="button" class="btn btn-sm btn-outline btn-edit-category" data-id="github" aria-label="Edit category GitHub">Edit</button>
+                <button type="button" class="btn btn-sm btn-outline btn-danger btn-delete-category" data-id="github" aria-label="Delete category GitHub">Delete</button>
+              </div>
+            </li>
+            <li class="category-item" data-category-id="google-drive">
+              <div class="category-info">
+                <strong class="category-item-name">Google Drive</strong>
+                <span class="category-item-desc">Cloud documents and spreadsheets</span>
+              </div>
+              <div class="category-item-actions">
+                <button type="button" class="btn btn-sm btn-outline btn-edit-category" data-id="google-drive" aria-label="Edit category Google Drive">Edit</button>
+                <button type="button" class="btn btn-sm btn-outline btn-danger btn-delete-category" data-id="google-drive" aria-label="Delete category Google Drive">Delete</button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn-close-category-manager">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: DELETE CONFIRMATION -->
+  <div class="modal-backdrop" id="modal-delete-confirm" role="dialog" aria-modal="true" aria-labelledby="modal-delete-title" hidden>
+    <div class="modal-dialog modal-dialog-sm">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-delete-title">Confirm Deletion</h2>
+        <button type="button" class="modal-btn-close" id="btn-close-modal-delete" aria-label="Close Delete Confirmation dialog">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="confirmation-message" id="delete-confirmation-message">
+          Are you sure you want to permanently delete this link? This action cannot be undone.
+        </p>
+        <!-- Hidden target ID placeholder for JS hook -->
+        <input type="hidden" id="delete-target-id" value="">
+        <input type="hidden" id="delete-target-type" value="link">
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn-cancel-delete">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btn-confirm-delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       REUSABLE HTML5 TEMPLATE ELEMENT FOR DYNAMIC LINK CARDS (For JavaScript)
+       ========================================================================= -->
+  <template id="template-link-card">
+    <article class="link-card" data-link-id="">
+      <div class="link-card-header">
+        <div class="service-badge-wrapper">
+          <span class="category-badge"></span>
+        </div>
+        <button type="button" class="btn-action-icon btn-favorite" aria-label="Toggle favorite" title="Toggle favorite">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+        </button>
+      </div>
+
+      <div class="link-card-body">
+        <h3 class="link-title">
+          <a href="#" target="_blank" rel="noopener noreferrer" class="link-anchor"></a>
+        </h3>
+        <p class="link-url-preview"></p>
+        <div class="link-category-row">
+          <span class="category-label-prefix">Category:</span>
+          <span class="category-badge"></span>
+        </div>
+        <div class="link-tags"></div>
+      </div>
+
+      <div class="link-card-footer">
+        <div class="link-card-actions">
+          <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline btn-open" title="Open URL in new tab" aria-label="Open link">
+            Open
+          </a>
+          <button type="button" class="btn btn-sm btn-outline btn-edit" title="Edit link" aria-label="Edit link">
+            Edit
+          </button>
+          <button type="button" class="btn btn-sm btn-outline btn-danger btn-delete" title="Delete link" aria-label="Delete link">
+            Delete
+          </button>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <!-- =========================================================================
+       APPLICATION SCRIPTS
+       Supports both Flask /app/static mount and direct file preview (../static)
+       ========================================================================= -->
+  <!-- MODAL: DUPLICATE LINK WARNING -->
+  <div class="modal-backdrop" id="duplicate-modal" role="dialog" aria-modal="true" aria-labelledby="modal-duplicate-title" hidden>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-duplicate-title">Duplicate Link Detected</h2>
+        <button type="button" class="modal-btn-close" id="btn-close-modal-duplicate" aria-label="Close Duplicate dialog">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size: 14px; color: var(--color-text-body); margin-bottom: 12px;">You already have this link saved in your vault.</p>
+        <div class="existing-link-info"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn-view-existing">View Existing</button>
+        <button type="button" class="btn btn-primary" id="btn-save-anyway">Save Anyway</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: WHATSAPP IMPORT STAGING -->
+  <div class="modal-backdrop" id="whatsapp-staging-modal" role="dialog" aria-modal="true" aria-labelledby="modal-whatsapp-staging-title" hidden>
+    <div class="modal-dialog" style="max-width: 800px;">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-whatsapp-staging-title" style="color: #1E3A8A;">WhatsApp Import Staging</h2>
+        <button type="button" class="modal-btn-close" id="btn-close-modal-whatsapp" aria-label="Close WhatsApp Staging dialog">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="whatsapp-dropzone" style="text-align:center; padding:32px; border:2px dashed #CBD5E1; border-radius:8px; margin-bottom:16px; cursor: pointer;" onclick="document.getElementById('whatsapp-file-input').click()">
+          <p style="color: #64748B; margin-bottom: 12px; font-weight: 500;">Drag and drop your WhatsApp .txt export file here, or click to upload.</p>
+          <input type="file" id="whatsapp-file-input" accept=".txt" style="display:none;">
+          <button type="button" class="btn btn-secondary">Select File</button>
+        </div>
+        
+        <div id="whatsapp-staging-container"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('whatsapp-staging-modal')">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="confirmWhatsAppImport()">Import Selected Links</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SHORT URL -->
+  <div class="modal-backdrop" id="modal-short-url" role="dialog" aria-modal="true" aria-labelledby="modal-short-url-title" hidden>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-short-url-title">Create Short URL</h2>
+        <button type="button" class="modal-btn-close" id="btn-close-modal-short" aria-label="Close Short URL dialog">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">Generate a compact, trackable link for easy sharing.</p>
+        
+        <form id="form-short-url" novalidate>
+          <input type="hidden" id="short-url-link-id">
+          
+          <div class="form-group" id="short-url-form-group">
+            <label for="short-url-alias" class="form-label">Custom Alias (Optional)</label>
+            <div style="display: flex; gap: 8px;">
+              <span style="display: inline-flex; align-items: center; padding: 0 12px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; color: var(--text-body);">
+                lv.link/
+              </span>
+              <input type="text" class="form-control" id="short-url-alias" placeholder="e.g. my-project">
+            </div>
+            <span class="form-hint">Leave blank to auto-generate a random code.</span>
+            
+            <div class="modal-footer" style="padding: 0; padding-top: 16px; border-top: none;">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-modal-short">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="btn-submit-short-url">Generate Link</button>
+            </div>
+          </div>
+        </form>
+
+        <div id="short-url-result-container" style="display: none; margin-top: 8px;">
+          <label class="form-label" style="color: var(--primary-color);">Your Short URL is Ready!</label>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input type="text" class="form-control" id="short-url-result" readonly style="background: #F0F4FF; color: var(--primary-color); font-weight: 500; border-color: var(--primary-color);">
+            <button type="button" class="btn btn-primary" id="btn-copy-short-url" style="white-space: nowrap;">Copy</button>
+          </div>
+          <div style="font-size: 13px; color: var(--status-healthy); display: none; margin-top: 4px;" id="short-url-copy-success">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom;"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied to clipboard!
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- MODAL: SIGN IN -->
+  <div class="modal-backdrop" id="modal-signin" role="dialog" aria-modal="true" aria-labelledby="modal-signin-title" hidden>
+    <div class="modal-dialog modal-dialog-sm">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-signin-title">Sign In</h2>
+        <button type="button" class="modal-btn-close" onclick="closeModal('modal-signin')" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-signin">
+          <div class="form-group">
+            <label for="signin-email" class="form-label">Email</label>
+            <input type="email" id="signin-email" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="signin-password" class="form-label">Password</label>
+            <input type="password" id="signin-password" class="form-control" required>
+          </div>
+          <div class="modal-footer" style="padding:0; padding-top:16px; border:none;">
+            <button type="submit" class="btn btn-primary" style="width:100%;">Sign In</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SIGN UP -->
+  <div class="modal-backdrop" id="modal-signup" role="dialog" aria-modal="true" aria-labelledby="modal-signup-title" hidden>
+    <div class="modal-dialog modal-dialog-sm">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-signup-title">Create Account</h2>
+        <button type="button" class="modal-btn-close" onclick="closeModal('modal-signup')" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-signup">
+          <div class="form-group">
+            <label for="signup-email" class="form-label">Email</label>
+            <input type="email" id="signup-email" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="signup-password" class="form-label">Password</label>
+            <input type="password" id="signup-password" class="form-control" required>
+          </div>
+          <div class="modal-footer" style="padding:0; padding-top:16px; border:none;">
+            <button type="submit" class="btn btn-primary" style="width:100%;">Create Account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/static/js/app.js?v=3" defer></script>
+  <script src="../static/js/app.js?v=3" defer
+    onerror="this.remove()"
+    onload="this.nextElementSibling && this.nextElementSibling.remove()"></script>
+    
+  <script>
+    window.INITIAL_CATEGORY = "{{ initial_category if initial_category else '' }}";
+    window.INITIAL_VIEW = "{{ initial_view if initial_view else '' }}";
+  </script>
+  {% block script_extras %}{% endblock %}
+</body>
+</html>
