@@ -1,23 +1,25 @@
 from typing import List, Optional, Tuple, Dict, Any
 from app.extensions import db
 from app.models.category import Category
+from flask import g
 
 
 class CategoryService:
     @staticmethod
     def get_all_categories() -> List[Category]:
         """Fetch all categories ordered by creation time."""
-        return Category.query.order_by(Category.name.asc()).all()
+        return Category.query.filter_by(user_id=getattr(g, 'user_id', None)).order_by(Category.name.asc()).all()
 
     @staticmethod
     def get_category_by_id(category_id: int) -> Optional[Category]:
         """Fetch a category by its primary key ID."""
-        return db.session.get(Category, category_id)
+        return Category.query.filter_by(id=category_id, user_id=getattr(g, 'user_id', None)).first()
 
     @staticmethod
     def get_category_by_name(name: str) -> Optional[Category]:
         """Fetch a category by its name (case-insensitive)."""
-        return Category.query.filter(Category.name.ilike(name.strip())).first()
+        return Category.query.filter(
+                Category.user_id == getattr(g, 'user_id', None),Category.name.ilike(name.strip()), Category.user_id==getattr(g, 'user_id', None)).first()
 
     @staticmethod
     def create_category(data: Dict[str, Any]) -> Tuple[Optional[Category], Optional[str]]:
@@ -37,6 +39,7 @@ class CategoryService:
         description = data.get("description", "").strip()
 
         category = Category(
+            user_id=getattr(g, 'user_id', None),
             name=name,
             color=color,
             icon=icon,
@@ -63,6 +66,7 @@ class CategoryService:
 
             # Check if another category has this name
             existing = Category.query.filter(
+                Category.user_id == getattr(g, 'user_id', None),
                 Category.name.ilike(new_name),
                 Category.id != category_id
             ).first()

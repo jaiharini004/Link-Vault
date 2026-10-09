@@ -6,10 +6,19 @@ class Category(db.Model):
     __tablename__ = "categories"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(100), nullable=False, index=True)
     color = db.Column(db.String(20), default="#1E3A8A", nullable=False)
     icon = db.Column(db.String(50), default="folder", nullable=False)
     description = db.Column(db.String(255), nullable=True)
+
+    # User ownership
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

@@ -2,6 +2,7 @@ from typing import List, Optional, Tuple, Dict, Any
 from urllib.parse import urlparse
 from app.extensions import db
 from app.models.link import Link
+from flask import g
 from app.models.category import Category
 import hashlib
 
@@ -48,7 +49,7 @@ class LinkService:
         sort: str = "latest"
     ) -> List[Link]:
         """Fetch links with optional filtering and sorting."""
-        query = Link.query
+        query = Link.query.filter_by(user_id=getattr(g, 'user_id', None))
 
         if category_id is not None:
             query = query.filter(Link.category_id == category_id)
@@ -71,7 +72,7 @@ class LinkService:
     @staticmethod
     def get_link_by_id(link_id: int) -> Optional[Link]:
         """Fetch single link by primary key."""
-        return db.session.get(Link, link_id)
+        return Link.query.filter_by(id=link_id, user_id=getattr(g, 'user_id', None)).first()
 
     @staticmethod
     def create_link(data: Dict[str, Any]) -> Tuple[Optional[Link], Optional[str]]:
@@ -117,6 +118,20 @@ class LinkService:
         else:
             link_type = link_type.strip().lower()
 
+        # Automatically assign category based on link_type if category_id is missing
+        if not category_id and link_type != "other":
+            cat_name_map = {
+                "drive": "google-drive",
+                "meet": "google-meet"
+            }
+            search_name = cat_name_map.get(link_type, link_type)
+            auto_cat = Category.query.filter(
+                Category.name.ilike(search_name),
+                Category.user_id == getattr(g, 'user_id', None)
+            ).first()
+            if auto_cat:
+                category_id = auto_cat.id
+
         # Handle tags (supports list or comma-separated string)
         raw_tags = data.get("tags", "")
         if isinstance(raw_tags, list):
@@ -125,6 +140,7 @@ class LinkService:
             tags = str(raw_tags).strip()
 
         link = Link(
+            user_id=getattr(g, 'user_id', None),
             title=title,
             url=raw_url,
             description=data.get("description", "").strip(),
@@ -229,14 +245,18 @@ class LinkService:
     @staticmethod
     def get_dashboard_stats() -> Dict[str, Any]:
         """Summary metrics for Harini's dashboard statistics widgets."""
-        total_links = Link.query.count()
-        total_categories = Category.query.count()
-        total_favorites = Link.query.filter_by(is_favorite=True).count()
+        user_id = getattr(g, 'user_id', None)
+        
+        total_links = Link.query.filter_by(user_id=user_id).count()
+        total_categories = Category.query.filter_by(user_id=user_id).count()
+        total_favorites = Link.query.filter_by(user_id=user_id, is_favorite=True).count()
 
         # Breakdown by category
         categories_counts = db.session.query(
             Category.name, db.func.count(Link.id)
-        ).outerjoin(Link, Link.category_id == Category.id).group_by(Category.name).all()
+        ).outerjoin(Link, db.and_(Link.category_id == Category.id, Link.user_id == user_id))\
+         .filter(Category.user_id == user_id)\
+         .group_by(Category.name).all()
         
         # Normalize keys for the frontend (e.g. 'Google Drive' -> 'google-drive')
         platform_breakdown = {}
@@ -249,14 +269,14 @@ class LinkService:
         # Breakdown by health status
         health = db.session.query(
             Link.status, db.func.count(Link.id)
-        ).group_by(Link.status).all()
+        ).filter(Link.user_id == user_id).group_by(Link.status).all()
         health_breakdown = {status: count for status, count in health}
 
-        # Short URL count — safe fallback if table doesn't exist yet
+        # Short URL count - safe fallback if table doesn't exist yet
         total_short_urls = 0
         try:
             from app.models.short_url import ShortURL
-            total_short_urls = ShortURL.query.count()
+            total_short_urls = ShortURL.query.filter_by(user_id=user_id).count()
         except Exception:
             pass
 

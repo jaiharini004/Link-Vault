@@ -58,7 +58,8 @@ def search_links():
     page = request.args.get("page", 1, type=int)
     limit = request.args.get("limit", 20, type=int)
 
-    query = Link.query
+    from flask import g
+    query = Link.query.filter_by(user_id=getattr(g, 'user_id', None))
 
     if q_term:
         search_pattern = f"%{q_term}%"
@@ -115,7 +116,8 @@ def check_duplicate():
     if not url:
         return jsonify({"is_duplicate": False}), 200
         
-    existing = Link.query.filter_by(url=url).first()
+    from flask import g
+    existing = Link.query.filter_by(url=url, user_id=getattr(g, 'user_id', None)).first()
     if existing:
         return jsonify({
             "is_duplicate": True,

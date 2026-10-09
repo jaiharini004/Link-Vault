@@ -54,6 +54,11 @@ async function fetchAPI(endpoint, options = {}) {
     "Accept": "application/json"
   };
 
+  const token = localStorage.getItem("lv_token");
+  if (token) {
+    defaultHeaders["Authorization"] = `Bearer ${token}`;
+  }
+
   const config = {
     method: options.method || "GET",
     headers: { ...defaultHeaders, ...options.headers },
@@ -604,7 +609,9 @@ function initializeEventListeners() {
         if (res && res.success) {
           localStorage.setItem("lv_token", res.token);
           closeModal("modal-signin");
-          updateAuthUI();
+          window.location.reload();
+        } else {
+          alert("Sign in failed: " + (res ? res.message : "Unknown error"));
         }
       } catch(err) {
         alert("Sign in failed: " + err.message);
@@ -623,8 +630,10 @@ function initializeEventListeners() {
         if (res && res.success) {
           localStorage.setItem("lv_token", res.token);
           closeModal("modal-signup");
-          updateAuthUI();
           alert("Account created successfully!");
+          window.location.reload();
+        } else {
+          alert("Sign up failed: " + (res ? res.message : "Unknown error"));
         }
       } catch(err) {
         alert("Sign up failed: " + err.message);
@@ -1557,56 +1566,5 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
 
 // Form Handlers for Auth
 document.addEventListener("DOMContentLoaded", () => {
-  const signinForm = document.getElementById("form-signin");
-  if (signinForm) {
-    signinForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("signin-email").value;
-      const password = document.getElementById("signin-password").value;
-      
-      try {
-        const res = await fetchAPI('/api/auth/signin', {
-          method: 'POST',
-          body: { email, password }
-        });
-        
-        if (res.success && res.token) {
-          localStorage.setItem("lv_token", res.token);
-          closeModal("modal-signin");
-          updateAuthUI();
-        } else {
-          alert(res.message || "Failed to sign in");
-        }
-      } catch (err) {
-        alert("Sign in error: " + err.message);
-      }
-    });
-  }
-
-  const signupForm = document.getElementById("form-signup");
-  if (signupForm) {
-    signupForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("signup-email").value;
-      const password = document.getElementById("signup-password").value;
-      
-      try {
-        const res = await fetchAPI('/api/auth/signup', {
-          method: 'POST',
-          body: { email, password }
-        });
-        
-        if (res.success && res.token) {
-          localStorage.setItem("lv_token", res.token);
-          closeModal("modal-signup");
-          updateAuthUI();
-        } else {
-          alert(res.message || "Failed to sign up");
-        }
-      } catch (err) {
-        alert("Sign up error: " + err.message);
-      }
-    });
-  }
 });
 
