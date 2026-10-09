@@ -74,7 +74,7 @@ async function fetchAPI(endpoint, options = {}) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const errorMsg = data.message || `HTTP Error ${response.status}: ${response.statusText}`;
+      const errorMsg = data.error || data.message || `HTTP Error ${response.status}: ${response.statusText}`;
       throw new Error(errorMsg);
     }
 
@@ -169,6 +169,7 @@ function renderLinkCards(linksContainerEl, links = []) {
             ${categoryValue ? `<span class="badge-category" style="padding: 2px 6px; border-radius: 4px; background: ${UI_TOKENS.colors.bgMain}; border: 1px solid ${UI_TOKENS.colors.border};">${escapeHTML(categoryValue)}</span>` : ''}
           </div>
           <div class="card-actions" style="display: flex; gap: 8px;">
+            <button onclick="handleCopyLink('${escapeHTML(originalUrl)}', this)" style="background: none; border: none; color: ${UI_TOKENS.colors.secondary}; cursor: pointer; font-size: 10px; font-weight: 600;">Copy</button>
             <button onclick="window.open('${escapeHTML(originalUrl)}', '_blank')" style="background: none; border: none; color: ${UI_TOKENS.colors.secondary}; cursor: pointer; font-size: 10px; font-weight: 600;">Open</button>
             <button onclick="handleEditLink(${link.id})" style="background: none; border: none; color: ${UI_TOKENS.colors.secondary}; cursor: pointer; font-size: 10px;">Edit</button>
             <button onclick="handleCheckSingleHealth(${link.id})" style="background: none; border: none; color: ${UI_TOKENS.colors.textMuted}; cursor: pointer; font-size: 10px;">Check Health</button>
@@ -186,6 +187,18 @@ function renderLinkCards(linksContainerEl, links = []) {
     console.error("Error rendering link cards:", error);
     linksContainerEl.innerHTML = `<div style="color: red; padding: 20px;">Failed to render links. Check console for details.</div>`;
   }
+}
+
+function handleCopyLink(url, btnEl) {
+  navigator.clipboard.writeText(url).then(() => {
+    const originalText = btnEl.textContent;
+    btnEl.textContent = "Copied!";
+    setTimeout(() => {
+      btnEl.textContent = originalText;
+    }, 2000);
+  }).catch(err => {
+    console.error("Failed to copy:", err);
+  });
 }
 
 function renderCategories(containerEl, categories = []) {
@@ -501,16 +514,17 @@ function initializeEventListeners() {
       const categorySelect = document.getElementById("add-link-category");
       if (categorySelect && !categorySelect.value) {
         let detected = "";
-        if (url.includes("github.com")) detected = "github";
-        else if (url.includes("drive.google.com")) detected = "google-drive";
-        else if (url.includes("meet.google.com")) detected = "google-meet";
-        else if (url.includes("youtube.com") || url.includes("youtu.be")) detected = "youtube";
-        else if (url.includes("linkedin.com")) detected = "linkedin";
+        const lowerUrl = url.toLowerCase();
+        if (lowerUrl.includes("github")) detected = "github";
+        else if (lowerUrl.includes("drive.google.com")) detected = "google-drive";
+        else if (lowerUrl.includes("meet.google.com")) detected = "google-meet";
+        else if (lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be")) detected = "youtube";
+        else if (lowerUrl.includes("linkedin")) detected = "linkedin";
         
         if (detected && appState.categories) {
           const match = appState.categories.find(c => c.name.toLowerCase().replace(/\s+/g, '-') === detected);
           if (match) {
-            categorySelect.value = match.id;
+            categorySelect.value = match.id.toString();
           }
         }
       }

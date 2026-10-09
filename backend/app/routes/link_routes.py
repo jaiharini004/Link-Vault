@@ -135,16 +135,35 @@ def check_link_health(link_id):
     if not link:
         return jsonify({"success": False, "message": "Link not found"}), 404
         
-    # Simulate a successful health check
-    link.status = "healthy"
-    link.status_code = 200
+    import urllib.request
+    import urllib.error
+    import time
+    
+    start_time = time.time()
+    try:
+        req = urllib.request.Request(link.url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        response = urllib.request.urlopen(req, timeout=5)
+        status_code = response.getcode()
+        link.status = "healthy"
+        health_status_str = "Healthy"
+    except urllib.error.HTTPError as e:
+        status_code = e.code
+        link.status = "unhealthy" if status_code >= 400 else "healthy"
+        health_status_str = "Unhealthy" if status_code >= 400 else "Healthy"
+    except Exception:
+        status_code = 500
+        link.status = "unhealthy"
+        health_status_str = "Unhealthy"
+        
+    latency_ms = int((time.time() - start_time) * 1000)
+    link.status_code = status_code
     db.session.commit()
     
     return jsonify({
         "success": True,
-        "health_status": "Healthy",
-        "status_code": 200,
-        "latency_ms": 150
+        "health_status": health_status_str,
+        "status_code": status_code,
+        "latency_ms": latency_ms
     }), 200
 
 

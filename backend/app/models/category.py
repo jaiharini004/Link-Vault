@@ -21,6 +21,9 @@ class Category(db.Model):
         cascade="all, delete-orphan"
     )
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     def to_dict(self, include_links_count: bool = True) -> dict:
         data = {
             "id": self.id,
