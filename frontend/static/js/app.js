@@ -436,6 +436,17 @@ function initializeEventListeners() {
     }, 200));
   }
 
+  const btnClearSearch = document.getElementById("btn-clear-search");
+  if (btnClearSearch && searchInput) {
+    btnClearSearch.addEventListener("click", () => {
+      searchInput.value = "";
+      appState.searchQuery = "";
+      appState.pagination.page = 1;
+      executeSearch();
+      searchInput.focus();
+    });
+  }
+
   // Sort Dropdown Change Listener
   const sortSelect = document.getElementById("select-sort-order");
   if (sortSelect) {
