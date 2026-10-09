@@ -941,6 +941,22 @@
     </div>
   </div>
 
+  <!-- MODAL: HEALTH CHECK DETAILS -->
+  <div class="modal-backdrop" id="modal-health-check" role="dialog" aria-modal="true" aria-labelledby="modal-health-title" hidden>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-health-title">Health Check Results</h2>
+        <button type="button" class="modal-btn-close" onclick="closeModal('modal-health-check')" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body" id="health-check-body">
+        <!-- Content will be injected dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-health-check')">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: SIGN UP -->
   <div class="modal-backdrop" id="modal-signup" role="dialog" aria-modal="true" aria-labelledby="modal-signup-title" hidden>
     <div class="modal-dialog modal-dialog-sm">

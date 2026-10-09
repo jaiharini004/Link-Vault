@@ -233,11 +233,18 @@ class LinkService:
         total_categories = Category.query.count()
         total_favorites = Link.query.filter_by(is_favorite=True).count()
 
-        # Breakdown by platform
-        platforms = db.session.query(
-            Link.link_type, db.func.count(Link.id)
-        ).group_by(Link.link_type).all()
-        platform_breakdown = {ptype: count for ptype, count in platforms}
+        # Breakdown by category
+        categories_counts = db.session.query(
+            Category.name, db.func.count(Link.id)
+        ).outerjoin(Link, Link.category_id == Category.id).group_by(Category.name).all()
+        
+        # Normalize keys for the frontend (e.g. 'Google Drive' -> 'google-drive')
+        platform_breakdown = {}
+        for cat_name, count in categories_counts:
+            key = cat_name.lower().replace(" ", "-")
+            if key == "google-drive": key = "drive"
+            if key == "google-meet": key = "meet"
+            platform_breakdown[key] = count
 
         # Breakdown by health status
         health = db.session.query(

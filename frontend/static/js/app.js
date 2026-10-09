@@ -1285,15 +1285,37 @@ async function handleBatchOrganizeSubmit(event) {
 }
 
 async function handleCheckSingleHealth(linkId) {
+  // Open the modal and show loading state
+  openModal("modal-health-check");
+  const bodyEl = document.getElementById("health-check-body");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div style="text-align: center; padding: 30px;">
+        <svg class="animate-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${UI_TOKENS.colors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;">
+          <line x1="12" y1="2" x2="12" y2="6"></line>
+          <line x1="12" y1="18" x2="12" y2="22"></line>
+          <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+          <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+          <line x1="2" y1="12" x2="6" y2="12"></line>
+          <line x1="18" y1="12" x2="22" y2="12"></line>
+          <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+          <line x1="16.24" y1="4.93" x2="19.07" y2="7.76"></line>
+        </svg>
+        <p style="margin-top: 15px; color: ${UI_TOKENS.colors.textMuted}; font-family: ${UI_TOKENS.fontFamily};">Analyzing link health in real-time...</p>
+        <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+      </div>
+    `;
+  }
+
   try {
     const res = await fetchAPI(`/api/links/${linkId}/health`, { method: "POST" });
     if (res && res.success) {
       // Find card in DOM and update health badge
       const card = document.querySelector(`.link-card[data-id="${linkId}"]`);
+      const healthInfo = UI_TOKENS.health[res.health_status] || UI_TOKENS.health.Unchecked;
+
       if (card) {
         const badge = card.querySelector(".health-badge");
-        const healthInfo = UI_TOKENS.health[res.health_status] || UI_TOKENS.health.Unchecked;
-
         if (badge) {
           badge.style.background = healthInfo.bg;
           badge.style.color = healthInfo.text;
@@ -1303,8 +1325,58 @@ async function handleCheckSingleHealth(linkId) {
           `;
         }
       }
+
+      // Render the logic into the modal
+      if (bodyEl) {
+        bodyEl.innerHTML = `
+          <div style="font-family: ${UI_TOKENS.fontFamily}; padding: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 15px; border-radius: 8px; background: ${healthInfo.bg}; border: 1px solid ${healthInfo.border || healthInfo.bg};">
+              <strong style="color: ${healthInfo.text}; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                <span style="width: 10px; height: 10px; border-radius: 50%; background: ${healthInfo.dot}; display: inline-block;"></span>
+                ${healthInfo.label}
+              </strong>
+              <span style="color: ${healthInfo.text}; opacity: 0.8; font-size: 12px; font-weight: 500;">HTTP ${res.http_status_code || 'N/A'}</span>
+            </div>
+            
+            <h4 style="font-size: 13px; color: ${UI_TOKENS.colors.textMuted}; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Health Check Details</h4>
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 14px; color: ${UI_TOKENS.colors.text}; display: flex; flex-direction: column; gap: 12px;">
+              <li style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="color: ${UI_TOKENS.colors.textMuted}; font-size: 12px;">Status Code</span>
+                <strong style="font-family: monospace; font-size: 15px; background: ${UI_TOKENS.colors.bgHover}; padding: 4px 8px; border-radius: 4px; display: inline-block; width: fit-content;">${res.http_status_code || 'None'}</strong>
+              </li>
+              <li style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="color: ${UI_TOKENS.colors.textMuted}; font-size: 12px;">Last Checked At</span>
+                <span>${res.last_checked_at ? new Date(res.last_checked_at).toLocaleString() : 'Just now'}</span>
+              </li>
+              <li style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="color: ${UI_TOKENS.colors.textMuted}; font-size: 12px;">Behind the Logic</span>
+                <span style="background: ${UI_TOKENS.colors.bgAccent}; padding: 10px; border-radius: 6px; font-size: 13px; line-height: 1.5; border: 1px solid ${UI_TOKENS.colors.border};">
+                  ${res.http_status_code >= 200 && res.http_status_code < 400 
+                    ? "The endpoint responded successfully indicating the link is active and reachable." 
+                    : res.http_status_code >= 400 
+                    ? "The endpoint returned an error, indicating the link may be broken, restricted, or permanently moved."
+                    : "The connection failed or timed out before receiving a valid HTTP response."}
+                </span>
+              </li>
+            </ul>
+          </div>
+        `;
+      }
     }
   } catch (err) {
+    if (bodyEl) {
+        bodyEl.innerHTML = `
+          <div style="padding: 20px; color: ${UI_TOKENS.colors.danger}; font-family: ${UI_TOKENS.fontFamily}; text-align: center;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 12px;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p><strong>Failed to perform health check.</strong></p>
+            <p style="font-size: 13px; margin-top: 8px; opacity: 0.8;">${err.message}</p>
+          </div>
+        `;
+    }
     console.error(`Single health check failed for ID ${linkId}:`, err.message);
   }
 }
