@@ -27,6 +27,30 @@ def create_app(config_name: str = None) -> Flask:
     cors.init_app(app, resources={r"/api/*": {"origins": app.config.get("CORS_ORIGINS", "*")}})
     migrate.init_app(app, db)
 
+    from flask import request, g
+    from app.models.user import User
+
+    @app.before_request
+    def authenticate_request():
+        if request.method == "OPTIONS":
+            return
+            
+        public_paths = ['/api/auth/signin', '/api/auth/signup', '/static', '/app/static']
+        if any(request.path.startswith(p) for p in public_paths) or request.path == '/' or request.path == '/favicon.ico':
+            return
+            
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            g.user_id = None
+            return
+            
+        token = auth_header.split(" ")[1]
+        user = User.query.filter_by(session_token=token).first()
+        if user:
+            g.user_id = user.id
+        else:
+            g.user_id = None
+
     # Register Core REST Blueprints (Vijay's Domain)
     app.register_blueprint(category_bp, url_prefix="/api/categories")
     app.register_blueprint(link_bp, url_prefix="/api/links")
@@ -53,6 +77,12 @@ def create_app(config_name: str = None) -> Flask:
     try:
         from app.routes.inbox_routes import inbox_bp
         app.register_blueprint(inbox_bp, url_prefix="/api/inbox")
+    except (ImportError, AttributeError):
+        pass
+
+    try:
+        from app.routes.health_routes import health_bp
+        app.register_blueprint(health_bp)
     except (ImportError, AttributeError):
         pass
 

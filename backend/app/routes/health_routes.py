@@ -37,3 +37,24 @@ def check_all_links_health():
         "message": "Bulk health check job initiated in background.",
         "total_queued": queued_count
     }), 202
+
+@health_bp.route('/api/health/summary', methods=['GET'])
+def get_health_summary():
+    """
+    Returns aggregate counts for each health status.
+    """
+    from app.services.link_service import LinkService
+    
+    stats = LinkService.get_dashboard_stats()
+    health_breakdown = stats.get("health_breakdown", {})
+    
+    return jsonify({
+        "success": True,
+        "data": {
+            "Healthy": health_breakdown.get("Healthy", 0),
+            "Broken": health_breakdown.get("Broken", 0),
+            "Restricted": health_breakdown.get("Restricted", 0),
+            "Unreachable": health_breakdown.get("Timeout/Unreachable", 0),
+            "Unchecked": health_breakdown.get("Unchecked", 0) + health_breakdown.get("healthy", 0) + health_breakdown.get("unhealthy", 0) # Fallbacks for legacy statuses
+        }
+    }), 200

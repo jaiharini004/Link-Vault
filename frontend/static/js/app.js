@@ -54,6 +54,11 @@ async function fetchAPI(endpoint, options = {}) {
     "Accept": "application/json"
   };
 
+  const token = localStorage.getItem("lv_token");
+  if (token) {
+    defaultHeaders["Authorization"] = `Bearer ${token}`;
+  }
+
   const config = {
     method: options.method || "GET",
     headers: { ...defaultHeaders, ...options.headers },
@@ -74,7 +79,7 @@ async function fetchAPI(endpoint, options = {}) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const errorMsg = data.message || `HTTP Error ${response.status}: ${response.statusText}`;
+      const errorMsg = data.error || data.message || `HTTP Error ${response.status}: ${response.statusText}`;
       throw new Error(errorMsg);
     }
 
@@ -169,6 +174,7 @@ function renderLinkCards(linksContainerEl, links = []) {
             ${categoryValue ? `<span class="badge-category" style="padding: 2px 6px; border-radius: 4px; background: ${UI_TOKENS.colors.bgMain}; border: 1px solid ${UI_TOKENS.colors.border};">${escapeHTML(categoryValue)}</span>` : ''}
           </div>
           <div class="card-actions" style="display: flex; gap: 8px;">
+            <button onclick="handleCopyLink('${escapeHTML(originalUrl)}', this)" style="background: none; border: none; color: ${UI_TOKENS.colors.secondary}; cursor: pointer; font-size: 10px; font-weight: 600;">Copy</button>
             <button onclick="window.open('${escapeHTML(originalUrl)}', '_blank')" style="background: none; border: none; color: ${UI_TOKENS.colors.secondary}; cursor: pointer; font-size: 10px; font-weight: 600;">Open</button>
             <button onclick="handleEditLink(${link.id})" style="background: none; border: none; color: ${UI_TOKENS.colors.secondary}; cursor: pointer; font-size: 10px;">Edit</button>
             <button onclick="handleCheckSingleHealth(${link.id})" style="background: none; border: none; color: ${UI_TOKENS.colors.textMuted}; cursor: pointer; font-size: 10px;">Check Health</button>
@@ -186,6 +192,18 @@ function renderLinkCards(linksContainerEl, links = []) {
     console.error("Error rendering link cards:", error);
     linksContainerEl.innerHTML = `<div style="color: red; padding: 20px;">Failed to render links. Check console for details.</div>`;
   }
+}
+
+function handleCopyLink(url, btnEl) {
+  navigator.clipboard.writeText(url).then(() => {
+    const originalText = btnEl.textContent;
+    btnEl.textContent = "Copied!";
+    setTimeout(() => {
+      btnEl.textContent = originalText;
+    }, 2000);
+  }).catch(err => {
+    console.error("Failed to copy:", err);
+  });
 }
 
 function renderCategories(containerEl, categories = []) {
@@ -423,6 +441,17 @@ function initializeEventListeners() {
     }, 200));
   }
 
+  const btnClearSearch = document.getElementById("btn-clear-search");
+  if (btnClearSearch && searchInput) {
+    btnClearSearch.addEventListener("click", () => {
+      searchInput.value = "";
+      appState.searchQuery = "";
+      appState.pagination.page = 1;
+      executeSearch();
+      searchInput.focus();
+    });
+  }
+
   // Sort Dropdown Change Listener
   const sortSelect = document.getElementById("select-sort-order");
   if (sortSelect) {
@@ -501,16 +530,17 @@ function initializeEventListeners() {
       const categorySelect = document.getElementById("add-link-category");
       if (categorySelect && !categorySelect.value) {
         let detected = "";
-        if (url.includes("github.com")) detected = "github";
-        else if (url.includes("drive.google.com")) detected = "google-drive";
-        else if (url.includes("meet.google.com")) detected = "google-meet";
-        else if (url.includes("youtube.com") || url.includes("youtu.be")) detected = "youtube";
-        else if (url.includes("linkedin.com")) detected = "linkedin";
+        const lowerUrl = url.toLowerCase();
+        if (lowerUrl.includes("github")) detected = "github";
+        else if (lowerUrl.includes("drive.google.com")) detected = "google-drive";
+        else if (lowerUrl.includes("meet.google.com")) detected = "google-meet";
+        else if (lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be")) detected = "youtube";
+        else if (lowerUrl.includes("linkedin")) detected = "linkedin";
         
         if (detected && appState.categories) {
           const match = appState.categories.find(c => c.name.toLowerCase().replace(/\s+/g, '-') === detected);
           if (match) {
-            categorySelect.value = match.id;
+            categorySelect.value = match.id.toString();
           }
         }
       }
@@ -579,7 +609,9 @@ function initializeEventListeners() {
         if (res && res.success) {
           localStorage.setItem("lv_token", res.token);
           closeModal("modal-signin");
-          updateAuthUI();
+          window.location.reload();
+        } else {
+          alert("Sign in failed: " + (res ? res.message : "Unknown error"));
         }
       } catch(err) {
         alert("Sign in failed: " + err.message);
@@ -598,8 +630,10 @@ function initializeEventListeners() {
         if (res && res.success) {
           localStorage.setItem("lv_token", res.token);
           closeModal("modal-signup");
-          updateAuthUI();
           alert("Account created successfully!");
+          window.location.reload();
+        } else {
+          alert("Sign up failed: " + (res ? res.message : "Unknown error"));
         }
       } catch(err) {
         alert("Sign up failed: " + err.message);
@@ -1271,15 +1305,37 @@ async function handleBatchOrganizeSubmit(event) {
 }
 
 async function handleCheckSingleHealth(linkId) {
+  // Open the modal and show loading state
+  openModal("modal-health-check");
+  const bodyEl = document.getElementById("health-check-body");
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div style="text-align: center; padding: 30px;">
+        <svg class="animate-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${UI_TOKENS.colors.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;">
+          <line x1="12" y1="2" x2="12" y2="6"></line>
+          <line x1="12" y1="18" x2="12" y2="22"></line>
+          <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+          <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+          <line x1="2" y1="12" x2="6" y2="12"></line>
+          <line x1="18" y1="12" x2="22" y2="12"></line>
+          <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+          <line x1="16.24" y1="4.93" x2="19.07" y2="7.76"></line>
+        </svg>
+        <p style="margin-top: 15px; color: ${UI_TOKENS.colors.textMuted}; font-family: ${UI_TOKENS.fontFamily};">Analyzing link health in real-time...</p>
+        <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+      </div>
+    `;
+  }
+
   try {
     const res = await fetchAPI(`/api/links/${linkId}/health`, { method: "POST" });
     if (res && res.success) {
       // Find card in DOM and update health badge
       const card = document.querySelector(`.link-card[data-id="${linkId}"]`);
+      const healthInfo = UI_TOKENS.health[res.health_status] || UI_TOKENS.health.Unchecked;
+
       if (card) {
         const badge = card.querySelector(".health-badge");
-        const healthInfo = UI_TOKENS.health[res.health_status] || UI_TOKENS.health.Unchecked;
-
         if (badge) {
           badge.style.background = healthInfo.bg;
           badge.style.color = healthInfo.text;
@@ -1289,8 +1345,58 @@ async function handleCheckSingleHealth(linkId) {
           `;
         }
       }
+
+      // Render the logic into the modal
+      if (bodyEl) {
+        bodyEl.innerHTML = `
+          <div style="font-family: ${UI_TOKENS.fontFamily}; padding: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 15px; border-radius: 8px; background: ${healthInfo.bg}; border: 1px solid ${healthInfo.border || healthInfo.bg};">
+              <strong style="color: ${healthInfo.text}; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                <span style="width: 10px; height: 10px; border-radius: 50%; background: ${healthInfo.dot}; display: inline-block;"></span>
+                ${healthInfo.label}
+              </strong>
+              <span style="color: ${healthInfo.text}; opacity: 0.8; font-size: 12px; font-weight: 500;">HTTP ${res.http_status_code || 'N/A'}</span>
+            </div>
+            
+            <h4 style="font-size: 13px; color: ${UI_TOKENS.colors.textMuted}; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Health Check Details</h4>
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 14px; color: ${UI_TOKENS.colors.text}; display: flex; flex-direction: column; gap: 12px;">
+              <li style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="color: ${UI_TOKENS.colors.textMuted}; font-size: 12px;">Status Code</span>
+                <strong style="font-family: monospace; font-size: 15px; background: ${UI_TOKENS.colors.bgHover}; padding: 4px 8px; border-radius: 4px; display: inline-block; width: fit-content;">${res.http_status_code || 'None'}</strong>
+              </li>
+              <li style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="color: ${UI_TOKENS.colors.textMuted}; font-size: 12px;">Last Checked At</span>
+                <span>${res.last_checked_at ? new Date(res.last_checked_at).toLocaleString() : 'Just now'}</span>
+              </li>
+              <li style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="color: ${UI_TOKENS.colors.textMuted}; font-size: 12px;">Behind the Logic</span>
+                <span style="background: ${UI_TOKENS.colors.bgAccent}; padding: 10px; border-radius: 6px; font-size: 13px; line-height: 1.5; border: 1px solid ${UI_TOKENS.colors.border};">
+                  ${res.http_status_code >= 200 && res.http_status_code < 400 
+                    ? "The endpoint responded successfully indicating the link is active and reachable." 
+                    : res.http_status_code >= 400 
+                    ? "The endpoint returned an error, indicating the link may be broken, restricted, or permanently moved."
+                    : "The connection failed or timed out before receiving a valid HTTP response."}
+                </span>
+              </li>
+            </ul>
+          </div>
+        `;
+      }
     }
   } catch (err) {
+    if (bodyEl) {
+        bodyEl.innerHTML = `
+          <div style="padding: 20px; color: ${UI_TOKENS.colors.danger}; font-family: ${UI_TOKENS.fontFamily}; text-align: center;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 12px;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p><strong>Failed to perform health check.</strong></p>
+            <p style="font-size: 13px; margin-top: 8px; opacity: 0.8;">${err.message}</p>
+          </div>
+        `;
+    }
     console.error(`Single health check failed for ID ${linkId}:`, err.message);
   }
 }
@@ -1460,56 +1566,5 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
 
 // Form Handlers for Auth
 document.addEventListener("DOMContentLoaded", () => {
-  const signinForm = document.getElementById("form-signin");
-  if (signinForm) {
-    signinForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("signin-email").value;
-      const password = document.getElementById("signin-password").value;
-      
-      try {
-        const res = await fetchAPI('/api/auth/signin', {
-          method: 'POST',
-          body: { email, password }
-        });
-        
-        if (res.success && res.token) {
-          localStorage.setItem("lv_token", res.token);
-          closeModal("modal-signin");
-          updateAuthUI();
-        } else {
-          alert(res.message || "Failed to sign in");
-        }
-      } catch (err) {
-        alert("Sign in error: " + err.message);
-      }
-    });
-  }
-
-  const signupForm = document.getElementById("form-signup");
-  if (signupForm) {
-    signupForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("signup-email").value;
-      const password = document.getElementById("signup-password").value;
-      
-      try {
-        const res = await fetchAPI('/api/auth/signup', {
-          method: 'POST',
-          body: { email, password }
-        });
-        
-        if (res.success && res.token) {
-          localStorage.setItem("lv_token", res.token);
-          closeModal("modal-signup");
-          updateAuthUI();
-        } else {
-          alert(res.message || "Failed to sign up");
-        }
-      } catch (err) {
-        alert("Sign up error: " + err.message);
-      }
-    });
-  }
 });
 

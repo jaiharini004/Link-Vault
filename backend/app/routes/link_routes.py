@@ -58,7 +58,8 @@ def search_links():
     page = request.args.get("page", 1, type=int)
     limit = request.args.get("limit", 20, type=int)
 
-    query = Link.query
+    from flask import g
+    query = Link.query.filter_by(user_id=getattr(g, 'user_id', None))
 
     if q_term:
         search_pattern = f"%{q_term}%"
@@ -115,7 +116,8 @@ def check_duplicate():
     if not url:
         return jsonify({"is_duplicate": False}), 200
         
-    existing = Link.query.filter_by(url=url).first()
+    from flask import g
+    existing = Link.query.filter_by(url=url, user_id=getattr(g, 'user_id', None)).first()
     if existing:
         return jsonify({
             "is_duplicate": True,
@@ -125,27 +127,6 @@ def check_duplicate():
     return jsonify({"is_duplicate": False}), 200
 
 
-@link_bp.route("/<int:link_id>/health", methods=["POST"])
-def check_link_health(link_id):
-    """
-    POST /api/links/<id>/health
-    Mock health check to satisfy the UI.
-    """
-    link = Link.query.get(link_id)
-    if not link:
-        return jsonify({"success": False, "message": "Link not found"}), 404
-        
-    # Simulate a successful health check
-    link.status = "healthy"
-    link.status_code = 200
-    db.session.commit()
-    
-    return jsonify({
-        "success": True,
-        "health_status": "Healthy",
-        "status_code": 200,
-        "latency_ms": 150
-    }), 200
 
 
 @link_bp.route("/stats", methods=["GET"])

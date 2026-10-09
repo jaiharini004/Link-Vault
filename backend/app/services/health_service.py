@@ -78,18 +78,18 @@ def perform_single_health_check(app, link_id: int) -> dict:
             logger.error("Link ID %s not found for health check.", link_id)
             return {}
 
-        status_str, status_code = evaluate_http_status(link.original_url)
+        status_str, status_code = evaluate_http_status(link.url)
 
-        link.health_status = status_str
-        link.http_status_code = status_code
+        link.status = status_str
+        link.status_code = status_code
         link.last_checked_at = datetime.utcnow()
 
         db.session.commit()
         
         # Need to re-read values to construct response
         link_id_val = link.id
-        health_status_val = link.health_status
-        http_status_code_val = link.http_status_code
+        health_status_val = link.status
+        http_status_code_val = link.status_code
         last_checked_at_val = link.last_checked_at.isoformat() + "Z" if link.last_checked_at else None
 
         ui_tokens = dict(HEALTH_TOKENS.get(status_str, HEALTH_TOKENS["Timeout/Unreachable"]))
