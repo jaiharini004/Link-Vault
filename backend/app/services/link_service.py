@@ -101,11 +101,14 @@ class LinkService:
         if category_id:
             try:
                 category_id = int(category_id)
+                category = db.session.get(Category, category_id)
             except ValueError:
-                return None, "Invalid category ID."
-            category = db.session.get(Category, category_id)
+                category = Category.query.filter(Category.name.ilike(str(category_id))).first()
+                if category:
+                    category_id = category.id
+                
             if not category:
-                return None, f"Category with id {category_id} does not exist."
+                return None, f"Invalid category ID or name: {category_id}"
 
         # Link type detection
         link_type = data.get("link_type")
@@ -169,11 +172,14 @@ class LinkService:
             if category_id is not None:
                 try:
                     category_id = int(category_id)
+                    category = db.session.get(Category, category_id)
                 except ValueError:
-                    return None, "Invalid category ID."
-                category = db.session.get(Category, category_id)
+                    category = Category.query.filter(Category.name.ilike(str(category_id))).first()
+                    if category:
+                        category_id = category.id
+
                 if not category:
-                    return None, f"Category with id {category_id} does not exist."
+                    return None, f"Invalid category ID or name: {category_id}"
             link.category_id = category_id
 
         if "link_type" in data:

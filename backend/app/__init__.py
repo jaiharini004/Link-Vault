@@ -56,6 +56,12 @@ def create_app(config_name: str = None) -> Flask:
     except (ImportError, AttributeError):
         pass
 
+    try:
+        from app.routes.health_routes import health_bp
+        app.register_blueprint(health_bp)
+    except (ImportError, AttributeError):
+        pass
+
     # Frontend Dashboard route
     @app.route("/")
     def index():

@@ -34,6 +34,7 @@ class Link(db.Model):
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_checked_at = db.Column(db.DateTime, nullable=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -76,6 +76,16 @@ with app.app_context():
     # Automatically ensure PostgreSQL tables exist on launch
     try:
         db.create_all()
+        
+        # Safely add the new last_checked_at column if it doesn't exist
+        from sqlalchemy import text
+        try:
+            db.session.execute(text("ALTER TABLE links ADD COLUMN last_checked_at TIMESTAMP"))
+            db.session.commit()
+            print("[LinkVault] Added last_checked_at column to links table.")
+        except Exception:
+            db.session.rollback() # Column already exists
+            
         seed_default_data()
         print("Connected to Supabase PostgreSQL database successfully.")
     except Exception as e:
